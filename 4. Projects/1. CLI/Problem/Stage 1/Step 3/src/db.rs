@@ -1,4 +1,4 @@
-use std::fs;
+use std::{cell::RefCell, fs};
 
 use anyhow::Result;
 
@@ -10,7 +10,9 @@ pub struct JiraDatabase {
 
 impl JiraDatabase {
     pub fn new(file_path: String) -> Self {
-        todo!()
+        // create a new JiraDatabase with the specified file path
+        let database = Box::new(JSONFileDatabase { file_path });
+        Self { database }
     }
 
     pub fn read_db(&self) -> Result<DBState> {
