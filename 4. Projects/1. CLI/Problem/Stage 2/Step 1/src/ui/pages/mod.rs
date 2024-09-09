@@ -24,6 +24,16 @@ impl Page for HomePage {
         println!("     id     |               name               |      status      ");
 
         // TODO: print out epics using get_column_string(). also make sure the epics are sorted by id
+        
+        let epics = self.db.read_db()?.epics;
+
+        for id in epics.keys().sorted() {
+            let epic = &epics[id];
+            let id_col = get_column_string(&id.to_string(), 11);
+            let name_col = get_column_string(&epic.name, 32);
+            let status_col = get_column_string(&epic.status.to_string(), 17);
+            println!("{} | {} | {}", id_col, name_col, status_col);
+        }
 
         println!();
         println!();
@@ -34,7 +44,19 @@ impl Page for HomePage {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        // match against the user input and return the corresponding action. If the user input was invalid return None.
+        match input {
+            "q" => Ok(Some(Action::Exit)),
+            "c" => {
+                Ok(Some(Action::CreateEpic))
+            }
+            input if input.parse::<u32>().map_or(false, |num| num >= 1 && num <= 9) => {
+                let epic_id: u32 = input.parse()?;
+                Ok(Some(Action::NavigateToEpicDetail { epic_id }))
+            }
+            _ => Ok(None),
+        }
+    
     }
 }
 
@@ -71,7 +93,20 @@ impl Page for EpicDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        match input {
+            "p" => Ok(Some(Action::NavigateToPreviousPage)),
+            "u" => Ok(Some(Action::UpdateEpicStatus { epic_id: self.epic_id })),
+            "d" => Ok(Some(Action::DeleteEpic { epic_id: self.epic_id })),
+            "c" => Ok(Some(Action::CreateStory { epic_id: self.epic_id })),
+            input if input.parse::<u32>().map_or(false, |num| num >= 1 && num <= 9) => {
+                let story_id: u32 = input.parse()?;
+                Ok(Some(Action::NavigateToStoryDetail {
+                    epic_id: self.epic_id,
+                    story_id
+                }))
+            }
+            _ => Ok(None),
+        }
     }
 }
 
@@ -100,7 +135,13 @@ impl Page for StoryDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        // match against the user input and return the corresponding action. If the user input was invalid return None.
+        match input {
+            "p" => Ok(Some(Action::NavigateToPreviousPage)),
+            "u" => Ok(Some(Action::UpdateStoryStatus { story_id: self.story_id })),
+            "d" => Ok(Some(Action::DeleteStory { epic_id: self.epic_id, story_id: self.story_id })),
+            _ => Ok(None),
+        }
     }
 }
 
