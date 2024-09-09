@@ -1,6 +1,6 @@
 use std::{cell::RefCell, fs};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use crate::models::{DBState, Epic, Story, Status};
 
@@ -11,36 +11,117 @@ pub struct JiraDatabase {
 impl JiraDatabase {
     pub fn new(file_path: String) -> Self {
         // create a new JiraDatabase with the specified file path
-        let database = Box::new(JSONFileDatabase { file_path });
-        Self { database }
+        Self {
+            database: Box::new(JSONFileDatabase { file_path })
+        }
     }
 
     pub fn read_db(&self) -> Result<DBState> {
-        todo!()
+        self.database.read_db()
     }
     
     pub fn create_epic(&self, epic: Epic) -> Result<u32> {
-        todo!()
+        let mut db_state = self.read_db()?;
+    
+        db_state.last_item_id += 1;
+        let new_id = db_state.last_item_id;
+        
+        db_state.epics.insert(new_id, epic);
+        
+        self.database.write_db(&db_state)?;
+        
+        Ok(new_id)
     }
     
     pub fn create_story(&self, story: Story, epic_id: u32) -> Result<u32> {
-        todo!()
+        let mut db_state = self.read_db()?;
+
+        if !db_state.epics.contains_key(&epic_id) {
+            return Err(anyhow!("Epic with id {} not found", epic_id));
+        }
+
+        db_state.last_item_id += 1;
+        let new_id = db_state.last_item_id;
+
+        db_state.stories.insert(new_id, story);
+        db_state.epics.get_mut(&epic_id).unwrap().stories.push(new_id);
+
+        self.database.write_db(&db_state)?;
+
+        Ok(new_id)
     }
     
     pub fn delete_epic(&self, epic_id: u32) -> Result<()> {
-        todo!()
+        let mut db_state = self.read_db()?;
+
+        if!db_state.epics.contains_key(&epic_id) {
+            return Err(anyhow!("Epic with id {} not found", epic_id));
+        }
+
+        // get stories associated with the epic
+        let stories_to_delete: Vec<_> = db_state.epics.get_mut(&epic_id).unwrap().stories.drain(..).collect();
+
+        // remove stories from the database
+        for story_id in stories_to_delete {
+            db_state.stories.remove(&story_id);
+        }
+
+        // remove the epic from the database
+        db_state.epics.remove(&epic_id);
+
+        self.database.write_db(&db_state)?;
+
+        Ok(())
+        
     }
     
     pub fn delete_story(&self,epic_id: u32, story_id: u32) -> Result<()> {
-        todo!()
+        let mut db_state = self.read_db()?;
+
+        if!db_state.epics.contains_key(&epic_id) {
+            return Err(anyhow!("Epic with id {} not found", epic_id));
+        }
+
+        if!db_state.epics.get_mut(&epic_id).unwrap().stories.contains(&story_id) {
+            return Err(anyhow!("Story with id {} not found in epic with id {}", story_id, epic_id));
+        }
+
+        // remove the story from the epic's list of stories
+        db_state.stories.remove(&story_id);
+        // remove the story from the epic's list of stories if it's still present in the epic's list of stories (in case it was deleted elsewhere)
+        // this ensures that the epic's list of stories is always up-to-date and consistent with the database state
+        // if the story was deleted elsewhere, we don't want to remove it from the epic's list of stories as it may still be referenced by other entities in the database
+        // if the story was not found in the epic's list of stories, we don't need to remove it as it's already been removed from the database in the previous step (delete_epic)
+        db_state.epics.get_mut(&epic_id).unwrap().stories.retain(|&id| id!= story_id);
+        self.database.write_db(&db_state)?;
+
+        Ok(())
     }
     
     pub fn update_epic_status(&self, epic_id: u32, status: Status) -> Result<()> {
-        todo!()
+        let mut db_state = self.read_db()?;
+
+        if!db_state.epics.contains_key(&epic_id) {
+            return Err(anyhow!("Epic with id {} not found", epic_id));
+        }
+
+        db_state.epics.get_mut(&epic_id).unwrap().status = status;
+        self.database.write_db(&db_state)?;
+
+        Ok(())
     }
     
     pub fn update_story_status(&self, story_id: u32, status: Status) -> Result<()> {
-        todo!()
+        let mut db_state = self.read_db()?;
+
+        if!db_state.stories.contains_key(&story_id) {
+            return Err(anyhow!("Story with id {} not found", story_id));
+        }
+
+        db_state.stories.get_mut(&story_id).unwrap().status = status;
+        self.database.write_db(&db_state)?;
+
+        Ok(())
     }
 }
 
